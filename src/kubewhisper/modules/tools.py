@@ -33,13 +33,13 @@ async def get_number_of_pods():
     try:
         # Load kube config from default location
         config.load_kube_config()
-        
+
         # Create API client
         v1 = client.CoreV1Api()
-        
+
         # List all pods across all namespaces
         pods = v1.list_pod_for_all_namespaces()
-        
+
         return {"pod_count": len(pods.items)}
     except Exception as e:
         return {"error": f"Failed to get pod count: {str(e)}"}
