@@ -19,9 +19,10 @@ def start():
         logger.info("Starting KubeWhisper...")
 
         assistant = Assistant()
-        asyncio.run(assistant.connect())
+        assistant.connect()
     except KeyboardInterrupt:
         logger.info("Shutting down KubeWhisper...")
+        assistant.stop_event.set()
     except Exception as e:
         logger.error(f"Error running KubeWhisper: {e}")
         raise

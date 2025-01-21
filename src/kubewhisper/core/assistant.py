@@ -1,20 +1,15 @@
 import os
 import json
-import asyncio
 import base64
+import socket
+import websocket
+import threading
 from loguru import logger
 from dotenv import load_dotenv
-from websockets.client import connect as ws_connect
-from websockets.exceptions import ConnectionClosedError
 from .kubernetes import KubernetesManager
 from .audio import AsyncMicrophone
 
 load_dotenv()
-
-SILENCE_THRESHOLD = 0.9
-PREFIX_PADDING_MS = 300
-SILENCE_DURATION_MS = 500
-
 
 class Assistant:
     def __init__(self):
@@ -31,65 +26,70 @@ class Assistant:
         }
 
         # State management
-        self.assistant_reply = ""
-        self.audio_chunks = []
-        self.response_in_progress = False
-        self.exit_event = asyncio.Event()
+        self.stop_event = threading.Event()
 
-    async def connect(self):
+    def connect(self):
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17"
-        headers = [("Authorization", f"Bearer {self.api_key}"), ("OpenAI-Beta", "realtime=v1")]
+        headers = [
+            f"Authorization: Bearer {self.api_key}",
+            "OpenAI-Beta: realtime=v1"
+        ]
+        
+        try:
+            ws = websocket.create_connection(url, header=headers)
+            logger.info("Connected to OpenAI realtime API")
+            
+            # Initialize session
+            self.initialize_session(ws)
+            
+            # Start recording
+            self.mic.start_recording()
+            
+            # Start message processing and audio sending threads
+            receive_thread = threading.Thread(target=self.process_ws_messages, args=(ws,))
+            audio_thread = threading.Thread(target=self.send_audio_loop, args=(ws,))
+            
+            receive_thread.start()
+            audio_thread.start()
+            
+            # Wait for stop event
+            while not self.stop_event.is_set():
+                threading.Event().wait(0.1)
+                
+            # Cleanup
+            ws.close()
+            receive_thread.join()
+            audio_thread.join()
+            
+        except Exception as e:
+            logger.error(f"Error in connection: {e}")
+            raise
 
-        while not self.exit_event.is_set():
-            try:
-                async with ws_connect(url, extra_headers=headers) as websocket:
-                    logger.info("Connected to OpenAI realtime API")
-                    await self.initialize_session(websocket)
-
-                    # Create tasks for message processing and audio sending
-                    ws_task = asyncio.create_task(self.process_ws_messages(websocket))
-                    audio_task = asyncio.create_task(self.send_audio_loop(websocket))
-
-                    # Start recording
-                    self.mic.start_recording()
-
-                    # Wait for either task to complete
-                    done, pending = await asyncio.wait([ws_task, audio_task], return_when=asyncio.FIRST_COMPLETED)
-
-                    # Cancel pending tasks
-                    for task in pending:
-                        task.cancel()
-
-                    if self.exit_event.is_set():
-                        break
-
-            except ConnectionClosedError:
-                logger.warning("Connection closed, reconnecting...")
-                await asyncio.sleep(1)
-            except Exception as e:
-                logger.error(f"Error in connection: {e}")
-                break
-
-    async def initialize_session(self, websocket):
+    def initialize_session(self, ws):
         session_update = {
             "type": "session.update",
             "session": {
-                "modalities": ["text", "audio"],
                 "instructions": """You are a Kubernetes cluster assistant. Help manage and monitor the cluster through voice commands.
                 When you hear commands about pods, nodes, or cluster status, execute the appropriate function and provide clear responses.
                 Keep responses concise and informative.""",
-                "voice": "alloy",
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
                 "turn_detection": {
                     "type": "server_vad",
-                    "threshold": SILENCE_THRESHOLD,
-                    "prefix_padding_ms": PREFIX_PADDING_MS,
-                    "silence_duration_ms": SILENCE_DURATION_MS,
+                    "threshold": 0.5,
+                    "prefix_padding_ms": 300,
+                    "silence_duration_ms": 500
                 },
-            },
+                "voice": "alloy",
+                "temperature": 1,
+                "max_response_output_tokens": 4096,
+                "modalities": ["text", "audio"],
+                "input_audio_format": "pcm16",
+                "output_audio_format": "pcm16",
+                "input_audio_transcription": {
+                    "model": "whisper-1"
+                }
+            }
         }
-        await websocket.send(json.dumps(session_update))
+        ws.send(json.dumps(session_update))
 
     async def process_ws_messages(self, websocket):
         while not self.exit_event.is_set():
