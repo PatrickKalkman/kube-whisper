@@ -67,21 +67,17 @@ async def get_cluster_information():
     try:
         # Load kube config from default location
         config.load_kube_config()
-        
+
         # Create API client
         v1 = client.CoreV1Api()
-        
+
         # Get all resources
         nodes = v1.list_node()
         pods = v1.list_pod_for_all_namespaces()
         namespaces = v1.list_namespace()
-        
+
         return {
-            "cluster_info": {
-                "nodes": len(nodes.items),
-                "pods": len(pods.items),
-                "namespaces": len(namespaces.items)
-            }
+            "cluster_info": {"nodes": len(nodes.items), "pods": len(pods.items), "namespaces": len(namespaces.items)}
         }
     except Exception as e:
         return {"error": f"Failed to get cluster information: {str(e)}"}
@@ -152,7 +148,9 @@ tools = [
     {
         "type": "function",
         "name": "get_cluster_information",
-        "description": "Returns comprehensive information about the Kubernetes cluster including node, pod, and namespace counts.",
+        "description": (
+            "Returns comprehensive information about the Kubernetescluster including node, pod, and namespace counts."
+        ),
         "parameters": {
             "type": "object",
             "properties": {},
