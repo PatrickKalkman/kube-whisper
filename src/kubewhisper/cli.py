@@ -83,12 +83,19 @@ class SimpleAssistant:
         async for message in websocket:
             event = json.loads(message)
             event_type = event.get("type")
-
+            
+            print(f"Received event: {event_type}")  # Debug logging
+            
             if event_type == "response.audio.delta":
-                chunk = base64.b64decode(event["delta"])
-                self.audio_chunks.append(chunk)
+                try:
+                    chunk = base64.b64decode(event["delta"])
+                    self.audio_chunks.append(chunk)
+                    print(f"Received audio chunk: {len(chunk)} bytes")
+                except Exception as e:
+                    print(f"Error decoding audio chunk: {str(e)}")
             elif event_type == "response.done":
                 print("\nAssistant response complete.")
+                print(f"Total audio chunks received: {len(self.audio_chunks)}")
                 self.play_audio_response()
                 break
 
@@ -98,9 +105,25 @@ class SimpleAssistant:
             return
 
         audio_data = b"".join(self.audio_chunks)
-        print("Playing response...")
-        sd.play(audio_data, samplerate=16000)
-        sd.wait()
+        print(f"Audio data received: {len(audio_data)} bytes")
+        
+        try:
+            print("Playing response...")
+            sd.play(audio_data, samplerate=16000)
+            sd.wait()
+        except Exception as e:
+            print(f"Error playing audio: {str(e)}")
+            print("Trying to save audio to debug.wav for inspection...")
+            try:
+                import wave
+                with wave.open("debug.wav", "wb") as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)  # 16-bit PCM
+                    wf.setframerate(16000)
+                    wf.writeframes(audio_data)
+                print("Audio saved to debug.wav - please check this file")
+            except Exception as save_error:
+                print(f"Failed to save audio: {str(save_error)}")
 
 
 if __name__ == "__main__":
