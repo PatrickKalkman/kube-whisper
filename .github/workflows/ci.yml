@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.12"]
-
+    
     steps:
     - uses: actions/checkout@v4
     
@@ -21,7 +21,12 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-        
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y portaudio19-dev python3-pyaudio
+    
     - name: Install uv
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -29,10 +34,10 @@ jobs:
     
     - name: Lint with ruff
       run: uv run ruff check src tests
-      
+    
     - name: Run tests
       run: uv run pytest tests/
-  
+
   build:
     needs: test
     runs-on: ubuntu-24.04
@@ -44,7 +49,12 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.10"
-        
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y portaudio19-dev python3-pyaudio
+    
     - name: Install uv
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -58,7 +68,7 @@ jobs:
       run: |
         echo "pkg_name=$(uv run python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['project']['name'])")" >> $GITHUB_OUTPUT
         echo "version=$(uv run python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['project']['version'])")" >> $GITHUB_OUTPUT
-
+    
     - name: Store build artifacts
       uses: actions/upload-artifact@v4
       with:
