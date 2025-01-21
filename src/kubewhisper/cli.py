@@ -4,7 +4,6 @@ import json
 import websockets
 import base64
 import sounddevice as sd
-from datetime import datetime
 import speech_recognition as sr
 
 # Replace with your Realtime API WebSocket URL
@@ -27,7 +26,7 @@ class SimpleAssistant:
             "OpenAI-Beta": "realtime=v1",
         }
 
-        async with websockets.connect(REALTIME_API_URL, headers=headers) as ws:
+        async with websockets.connect(REALTIME_API_URL, additional_headers=headers) as ws:
             print("Connected to Realtime API.")
             await self.initialize_session(ws)
             while True:
