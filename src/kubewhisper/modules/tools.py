@@ -45,12 +45,30 @@ async def get_number_of_pods():
         return {"error": f"Failed to get pod count: {str(e)}"}
 
 
+async def get_number_of_namespaces():
+    """Returns the number of namespaces in the current Kubernetes cluster."""
+    try:
+        # Load kube config from default location
+        config.load_kube_config()
+        
+        # Create API client
+        v1 = client.CoreV1Api()
+        
+        # List all namespaces
+        namespaces = v1.list_namespace()
+        
+        return {"namespace_count": len(namespaces.items)}
+    except Exception as e:
+        return {"error": f"Failed to get namespace count: {str(e)}"}
+
+
 # Map function names to their corresponding functions
 function_map = {
     "get_current_time": get_current_time,
     "get_random_number": get_random_number,
     "get_number_of_nodes": get_number_of_nodes,
     "get_number_of_pods": get_number_of_pods,
+    "get_number_of_namespaces": get_number_of_namespaces,
 }
 
 # Tools array for session initialization
@@ -89,6 +107,16 @@ tools = [
         "type": "function",
         "name": "get_number_of_pods",
         "description": "Returns the number of pods in a Kubernetes cluster.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_number_of_namespaces",
+        "description": "Returns the number of namespaces in a Kubernetes cluster.",
         "parameters": {
             "type": "object",
             "properties": {},
