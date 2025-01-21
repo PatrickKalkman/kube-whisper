@@ -28,6 +28,23 @@ async def get_number_of_nodes():
         return {"error": f"Failed to get node count: {str(e)}"}
 
 
+async def get_number_of_pods():
+    """Returns the number of pods in the current Kubernetes cluster."""
+    try:
+        # Load kube config from default location
+        config.load_kube_config()
+        
+        # Create API client
+        v1 = client.CoreV1Api()
+        
+        # List all pods across all namespaces
+        pods = v1.list_pod_for_all_namespaces()
+        
+        return {"pod_count": len(pods.items)}
+    except Exception as e:
+        return {"error": f"Failed to get pod count: {str(e)}"}
+
+
 # Map function names to their corresponding functions
 function_map = {
     "get_current_time": get_current_time,
