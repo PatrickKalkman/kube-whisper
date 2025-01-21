@@ -16,13 +16,13 @@ async def get_number_of_nodes():
     try:
         # Load kube config from default location
         config.load_kube_config()
-        
+
         # Create API client
         v1 = client.CoreV1Api()
-        
+
         # List all nodes
         nodes = v1.list_node()
-        
+
         return {"node_count": len(nodes.items)}
     except Exception as e:
         return {"error": f"Failed to get node count: {str(e)}"}
@@ -33,6 +33,7 @@ function_map = {
     "get_current_time": get_current_time,
     "get_random_number": get_random_number,
     "get_number_of_nodes": get_number_of_nodes,
+    "get_number_of_pods": get_number_of_pods,
 }
 
 # Tools array for session initialization
@@ -61,6 +62,16 @@ tools = [
         "type": "function",
         "name": "get_number_of_nodes",
         "description": "Returns the number of nodes in a Kubernetes cluster.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_number_of_pods",
+        "description": "Returns the number of pods in a Kubernetes cluster.",
         "parameters": {
             "type": "object",
             "properties": {},
