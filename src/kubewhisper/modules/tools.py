@@ -1,5 +1,6 @@
 import random
 import datetime
+from kubernetes import client, config
 
 
 async def get_current_time():
@@ -8,6 +9,23 @@ async def get_current_time():
 
 async def get_random_number():
     return {"random_number": random.randint(1, 100)}
+
+
+async def get_number_of_nodes():
+    """Returns the number of nodes in the current Kubernetes cluster."""
+    try:
+        # Load kube config from default location
+        config.load_kube_config()
+        
+        # Create API client
+        v1 = client.CoreV1Api()
+        
+        # List all nodes
+        nodes = v1.list_node()
+        
+        return {"node_count": len(nodes.items)}
+    except Exception as e:
+        return {"error": f"Failed to get node count: {str(e)}"}
 
 
 # Map function names to their corresponding functions
