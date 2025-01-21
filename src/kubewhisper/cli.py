@@ -27,7 +27,7 @@ class SimpleAssistant:
             "OpenAI-Beta": "realtime=v1",
         }
 
-        async with websockets.connect(REALTIME_API_URL, extra_headers=headers) as ws:
+        async with websockets.connect(REALTIME_API_URL, headers=headers) as ws:
             print("Connected to Realtime API.")
             await self.initialize_session(ws)
             while True:
