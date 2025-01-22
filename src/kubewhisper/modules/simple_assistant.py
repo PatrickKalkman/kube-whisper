@@ -93,11 +93,33 @@ class SimpleAssistant:
                     self.mic.start_recording()
                     
                 if self.mic.state == MicrophoneState.RECORDING:
-                    audio_data = self.mic.get_audio_data()
-                    if audio_data and len(audio_data) > 0:
-                        await self.ws_manager.send_audio_data(audio_data)
-                    else:
-                        logger.debug("No audio data to send")
+                    try:
+                        audio_data = self.mic.get_audio_data()
+                        if audio_data:
+                            logger.debug(f"Preparing to send {len(audio_data)} bytes of audio data")
+                            if len(audio_data) > 0:
+                                try:
+                                    await self.ws_manager.send_audio_data(audio_data)
+                                    logger.debug(f"Successfully sent {len(audio_data)} bytes of audio data")
+                                except Exception as send_error:
+                                    logger.error(f"Error sending audio data: {str(send_error)}")
+                                    logger.debug(f"Audio data length: {len(audio_data)} bytes")
+                                    logger.debug(f"Microphone state: {self.mic.state}")
+                                    # Retain the audio data for retry
+                                    self.mic._audio_queue.put(audio_data)
+                            else:
+                                logger.debug("Empty audio data received")
+                        else:
+                            logger.debug("No audio data available")
+                            
+                        # Log buffer state
+                        buffer_size = self.mic._audio_queue.qsize()
+                        logger.debug(f"Audio buffer size: {buffer_size} chunks")
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing audio data: {str(e)}")
+                        logger.debug(f"Microphone state: {self.mic.state}")
+                        logger.debug(f"Audio queue size: {self.mic._audio_queue.qsize()}")
                 elif self.mic.state == MicrophoneState.RECEIVING:
                     await asyncio.sleep(0.1)  # Wait while receiving assistant response
         except KeyboardInterrupt:
