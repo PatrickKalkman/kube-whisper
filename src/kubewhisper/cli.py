@@ -8,10 +8,12 @@ from datetime import datetime
 import speech_recognition as sr
 from kubewhisper.modules.logging import log_tool_call, log_error, log_info, log_warning
 from kubewhisper.modules.logging import logger, log_ws_event
-from kubewhisper.modules.tools import (
-    function_map,
-    tools,
-)
+from kubewhisper.modules.tools import function_map as base_function_map, tools as base_tools
+from kubewhisper.modules.kubernetes_tools import function_map as k8s_function_map, tools as k8s_tools
+
+# Combine function maps and tools
+function_map = {**base_function_map, **k8s_function_map}
+tools = base_tools + k8s_tools
 from websockets.exceptions import ConnectionClosedError
 from kubewhisper.modules.async_microphone import AsyncMicrophone
 from kubewhisper.modules.audio import play_audio
