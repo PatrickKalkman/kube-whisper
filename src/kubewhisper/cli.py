@@ -2,7 +2,7 @@ import os
 import asyncio
 
 from kubewhisper.modules.simple_assistant import SimpleAssistant
-from kubewhisper.utils import log_info
+from kubewhisper.modules.logging import log_info
 
 REALTIME_API_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
 API_KEY = os.getenv("OPENAI_API_KEY")
