@@ -1,12 +1,12 @@
 import asyncio
 import json
 import time
-import websockets
 import base64
 import speech_recognition as sr
 from websockets.exceptions import ConnectionClosedError
 from kubewhisper.modules.logging import log_tool_call, log_error, log_info, log_warning
-from kubewhisper.modules.logging import logger, log_ws_event
+from kubewhisper.modules.logging import logger
+from kubewhisper.modules.websocket_manager import WebSocketManager
 from kubewhisper.modules.tools import function_map as base_function_map, tools as base_tools
 from kubewhisper.modules.kubernetes_tools import function_map as k8s_function_map, tools as k8s_tools
 from kubewhisper.modules.async_microphone import AsyncMicrophone
@@ -33,8 +33,7 @@ class SimpleAssistant:
         self.audio_chunks = []
         self.mic = AsyncMicrophone()
         self.exit_event = asyncio.Event()
-        self.openai_api_key = openai_api_key
-        self.realtime_api_url = realtime_api_url
+        self.ws_manager = WebSocketManager(openai_api_key, realtime_api_url)
 
         # Initialize state variables
         self.assistant_reply = ""
