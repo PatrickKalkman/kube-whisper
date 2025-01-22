@@ -60,22 +60,21 @@ def log_ws_event(direction, event):
     }
     emoji = event_emojis.get(event_type, "❓")
     icon = "⬆️ - Out" if direction == "Outgoing" else "⬇️ - In"
-    color = "<cyan>" if direction == "Outgoing" else "<green>"
-    logger.info(f"{color}{emoji} {icon} {event_type}</cyan>")
+    logger.info(f"{emoji} {icon} {event_type}")
 
 
 def log_tool_call(function_name, args, result):
-    logger.info(f"<magenta>🛠️ Calling function: {function_name} with args: {args}</magenta>")
-    logger.info(f"<yellow>🛠️ Function call result: {result}</yellow>")
+    logger.info(f"🛠️ Calling function: {function_name} with args: {args}")
+    logger.info(f"🛠️ Function call result: {result}")
 
 
 def log_error(message):
-    logger.error(f"<red>{message}</red>")
+    logger.error(message)
 
 
 def log_info(message, style="white"):
-    logger.info(f"<{style}>{message}</{style}>")
+    logger.info(message)
 
 
 def log_warning(message):
-    logger.warning(f"<yellow>{message}</yellow>")
+    logger.warning(message)
