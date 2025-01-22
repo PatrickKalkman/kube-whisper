@@ -64,9 +64,7 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
 
         # Get pods from deployment
         deployment = apps_v1.read_namespaced_deployment(
-            name=deployment_name,
-            namespace=namespace
-        )
+            name=deployment_name, namespace=namespace)
         
         # Get label selector
         selector = deployment.spec.selector.match_labels
@@ -74,9 +72,7 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
         
         # Get pods with this selector
         pods = core_v1.list_namespaced_pod(
-            namespace=namespace,
-            label_selector=label_selector
-        )
+            namespace=namespace, label_selector=label_selector)
         
         error_patterns = {
             "exception": r"(?i)(exception|error|failure|failed|traceback)",
@@ -120,11 +116,14 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
                         # Check for different error patterns
                         for error_type, pattern in error_patterns.items():
                             if re.search(pattern, line):
-                                errors[error_type].append({
-                                    "timestamp": timestamp_str,
-                                    "message": line.strip(),
-                                    "age_minutes": round((current_time - timestamp).total_seconds() / 60, 1)
-                                })
+                                errors[error_type].append(
+                                    {
+                                        "timestamp": timestamp_str,
+                                        "message": line.strip(),
+                                        "age_minutes": round(
+                                            (current_time - timestamp).total_seconds() / 60, 1)
+                                    }
+                                )
                                 error_counts[error_type] += 1
                                 total_errors += 1
 
@@ -132,7 +131,8 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
                         continue
 
             except Exception as e:
-                errors["pod_access_errors"].append(f"Could not access logs for pod {pod.metadata.name}: {str(e)}")
+                errors["pod_access_errors"].append(
+                    f"Could not access logs for pod {pod.metadata.name}: {str(e)}")
 
         return {
             "summary": {
@@ -164,10 +164,7 @@ async def get_cluster_status():
         
         # Get metrics using metrics API
         metrics = custom.list_cluster_custom_object(
-            group="metrics.k8s.io",
-            version="v1beta1",
-            plural="nodes"
-        )
+            group="metrics.k8s.io", version="v1beta1", plural="nodes")
         
         # Calculate resource usage
         total_cpu_usage = 0
@@ -216,11 +213,13 @@ async def get_cluster_status():
             if (event.type == "Warning" and 
                 event.last_timestamp and 
                 event.last_timestamp.timestamp() > fifteen_mins_ago):
-                recent_issues.append({
-                    "reason": event.reason,
-                    "message": event.message,
-                    "component": event.involved_object.kind
-                })
+                recent_issues.append(
+                    {
+                        "reason": event.reason,
+                        "message": event.message,
+                        "component": event.involved_object.kind
+                    }
+                )
         
         # Prepare status response
         status_response = {
@@ -237,7 +236,8 @@ async def get_cluster_status():
                 "count": len(recent_issues),
                 "summary": recent_issues
             } if recent_issues else None,
-            "status_summary": "Issues Detected" if recent_issues else "All Systems Normal",
+            "status_summary": ("Issues Detected" 
+                if recent_issues else "All Systems Normal"),
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
         
@@ -264,7 +264,10 @@ tools = [
     {
         "type": "function",
         "name": "analyze_deployment_logs",
-        "description": "Analyzes logs from all pods in a deployment for criticals/errors/warnings in the last hour.",
+        "description": (
+            "Analyzes logs from all pods in a deployment for "
+            "criticals/errors/warnings in the last hour."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -315,8 +318,8 @@ tools = [
         "type": "function",
         "name": "get_cluster_status",
         "description": (
-            "Returns detailed status information about the Kubernetes cluster including node metrics, "
-            "pod status, resource usage, and recent issues."
+            "Returns detailed status information about the Kubernetes cluster "
+            "including node metrics, pod status, resource usage, and recent issues."
         ),
         "parameters": {
             "type": "object",
