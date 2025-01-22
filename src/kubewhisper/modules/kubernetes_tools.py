@@ -261,7 +261,7 @@ async def switch_cluster(cluster_name: str):
         # Load the current kubeconfig
         config_file = config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION
         kube_config = config.kube_config.KubeConfigLoader(
-            config_file_name=config_file
+            config_file=config_file
         ).load_and_merge()
         
         # Update the current-context
