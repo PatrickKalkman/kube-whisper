@@ -41,7 +41,7 @@ class SimpleAssistant:
                 session_config = {
                     "modalities": ["text", "audio"],
                     "instructions": SESSION_INSTRUCTIONS,
-                    "voice": "alloy",
+                    "voice": "sage",
                     "input_audio_format": "pcm16",
                     "output_audio_format": "pcm16",
                     "turn_detection": {
