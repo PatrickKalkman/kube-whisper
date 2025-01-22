@@ -13,7 +13,6 @@ from kubewhisper.modules.tools import function_map as base_function_map, tools a
 from kubewhisper.modules.kubernetes_tools import function_map as k8s_function_map, tools as k8s_tools
 from kubewhisper.modules.async_microphone import AsyncMicrophone
 from kubewhisper.modules.audio import play_audio
-from kubewhisper.modules.audio_manager import AudioManager
 
 # Combine function maps and tools
 function_map = {**base_function_map, **k8s_function_map}
@@ -35,10 +34,8 @@ class SimpleAssistant:
         self.audio_chunks = []
         self.mic = AsyncMicrophone()
         self.exit_event = asyncio.Event()
-        self.audio_manager = AudioManager()
         self.ws_manager = WebSocketManager(openai_api_key, realtime_api_url)
 
-        # Initialize state variables
         self.assistant_reply = ""
         self.audio_chunks = []
         self.response_in_progress = False
