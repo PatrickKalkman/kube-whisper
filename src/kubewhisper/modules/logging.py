@@ -1,12 +1,10 @@
+import sys
 from loguru import logger
 
-# Configure loguru
-logger.remove()  # Remove default handler
 
-# Add console output
-logger.add(
-    sink=lambda msg: print(msg), format="<level>{time:HH:mm:ss}</level> | {message}", colorize=True, level="INFO"
-)
+# Configure loguru
+logger.remove()
+logger.add(sys.stdout, format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}", level="INFO")
 
 # Add file output with rotation
 logger.add(
@@ -69,7 +67,7 @@ def log_error(message):
     logger.error(message)
 
 
-def log_info(message, style="white"):
+def log_info(message):
     logger.info(message)
 
 

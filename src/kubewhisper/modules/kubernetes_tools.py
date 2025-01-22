@@ -1,5 +1,3 @@
-import datetime
-import random
 from kubernetes import client, config
 
 
