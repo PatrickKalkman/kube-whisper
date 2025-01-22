@@ -210,6 +210,35 @@ async def get_kubernetes_latest_version_information() -> Dict[str, Any]:
     except Exception as e:
         return {"error": f"Failed to get Kubernetes version information: {str(e)}"}
 
+async def get_available_clusters():
+    """Returns a list of all available Kubernetes clusters from the kubeconfig."""
+    try:
+        # Get all contexts from kubeconfig
+        contexts, active_context = config.list_kube_config_contexts()
+        if not contexts:
+            return {"error": "No Kubernetes contexts found in kubeconfig"}
+            
+        clusters = []
+        active_cluster = None
+        
+        for ctx in contexts:
+            cluster_info = {
+                "name": ctx['context']['cluster'],
+                "context_name": ctx['name'],
+                "is_active": ctx == active_context
+            }
+            clusters.append(cluster_info)
+            if cluster_info["is_active"]:
+                active_cluster = cluster_info
+                
+        return {
+            "clusters": clusters,
+            "active_cluster": active_cluster,
+            "total_clusters": len(clusters)
+        }
+    except config.config_exception.ConfigException as e:
+        return {"error": f"Failed to get cluster information: {str(e)}"}
+
 async def get_cluster_name():
     """Returns the name of the current Kubernetes cluster."""
     try:
@@ -324,10 +353,21 @@ function_map = {
     "get_version_info": get_version_info,
     "get_kubernetes_latest_version_information": get_kubernetes_latest_version_information,
     "get_cluster_name": get_cluster_name,
+    "get_available_clusters": get_available_clusters,
 }
 
 # Tools array for session initialization
 tools = [
+    {
+        "type": "function",
+        "name": "get_available_clusters",
+        "description": "Returns a list of all available Kubernetes clusters configured in kubeconfig.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
     {
         "type": "function",
         "name": "get_cluster_name",
