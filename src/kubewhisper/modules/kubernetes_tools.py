@@ -306,6 +306,39 @@ async def get_cluster_name():
     except config.config_exception.ConfigException as e:
         return {"error": f"Failed to get cluster name: {str(e)}"}
 
+async def get_last_events():
+    """Retrieve the message of the last four events in the cluster."""
+    try:
+        config.load_kube_config()
+        v1 = client.CoreV1Api()
+        
+        # Get last 4 events, sorted by last timestamp
+        events = v1.list_event_for_all_namespaces(limit=4, _preload_content=False)
+        events_data = json.loads(events.data)
+        
+        # Extract relevant information
+        event_messages = []
+        for event in events_data.get('items', []):
+            event_messages.append({
+                "type": event.get('type'),
+                "reason": event.get('reason'),
+                "message": event.get('message'),
+                "timestamp": event.get('lastTimestamp'),
+                "involved_object": {
+                    "kind": event.get('involvedObject', {}).get('kind'),
+                    "name": event.get('involvedObject', {}).get('name')
+                }
+            })
+            
+        return {
+            "events": event_messages,
+            "count": len(event_messages),
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+    except Exception as e:
+        return {"error": f"Failed to get events: {str(e)}"}
+
+
 async def get_cluster_status():
     """Returns detailed status information about the Kubernetes cluster."""
     try:
@@ -393,6 +426,7 @@ async def get_cluster_status():
 
 # Map function names to their corresponding functions
 function_map = {
+    "get_last_events": get_last_events,
     "get_number_of_nodes": get_number_of_nodes,
     "get_number_of_pods": get_number_of_pods,
     "get_number_of_namespaces": get_number_of_namespaces,
@@ -407,6 +441,16 @@ function_map = {
 
 # Tools array for session initialization
 tools = [
+    {
+        "type": "function",
+        "name": "get_last_events",
+        "description": "Retrieve the message of the last four events in the cluster.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
     {
         "type": "function",
         "name": "switch_cluster",
