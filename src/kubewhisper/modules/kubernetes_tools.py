@@ -171,6 +171,43 @@ async def get_version_info():
     except Exception as e:
         return {"error": f"Failed to get version info: {str(e)}"}
 
+async def get_kubernetes_latest_version_information() -> Dict[str, Any]:
+    """Retrieves the latest stable version information from the Kubernetes GitHub repository."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Get releases from GitHub API
+            async with session.get('https://api.github.com/repos/kubernetes/kubernetes/releases') as response:
+                if response.status != 200:
+                    return {"error": f"GitHub API request failed with status {response.status}"}
+                
+                releases = await response.json()
+                
+                # Filter and process releases
+                stable_releases = []
+                for release in releases:
+                    if not release['prerelease'] and not release['draft']:
+                        version = release['tag_name'].lstrip('v')
+                        published_at = release['published_at']
+                        stable_releases.append({
+                            "version": version,
+                            "published_at": published_at,
+                            "html_url": release['html_url']
+                        })
+                        if len(stable_releases) >= 5:  # Get latest 5 stable releases
+                            break
+                
+                if not stable_releases:
+                    return {"error": "No stable releases found"}
+                
+                return {
+                    "latest_stable_version": stable_releases[0]['version'],
+                    "latest_releases": stable_releases,
+                    "retrieved_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                }
+                
+    except Exception as e:
+        return {"error": f"Failed to get Kubernetes version information: {str(e)}"}
+
 async def get_cluster_status():
     """Returns detailed status information about the Kubernetes cluster."""
     try:
@@ -264,10 +301,21 @@ function_map = {
     "get_cluster_status": get_cluster_status,
     "analyze_deployment_logs": analyze_deployment_logs,
     "get_version_info": get_version_info,
+    "get_kubernetes_latest_version_information": get_kubernetes_latest_version_information,
 }
 
 # Tools array for session initialization
 tools = [
+    {
+        "type": "function",
+        "name": "get_kubernetes_latest_version_information",
+        "description": "Retrieves the latest stable version information from the Kubernetes GitHub repository.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
     {
         "type": "function",
         "name": "get_version_info",
