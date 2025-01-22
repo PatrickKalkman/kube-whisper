@@ -6,7 +6,7 @@ class SessionConfig:
         self.config = {
             "modalities": ["text", "audio"],
             "instructions": Config.SESSION_INSTRUCTIONS,
-            "voice": "sage",
+            "voice": "coral",
             "input_audio_format": "pcm16",
             "output_audio_format": "pcm16",
             "turn_detection": {
