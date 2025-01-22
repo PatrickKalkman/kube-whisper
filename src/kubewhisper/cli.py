@@ -325,10 +325,14 @@ class SimpleAssistant:
             await websocket.close()
 
 
-if __name__ == "__main__":
-    print("Starting assistant. Press Ctrl+C to quit.")
+def main():
+    log_info("Starting assistant. Press Ctrl+C to quit.")
     assistant = SimpleAssistant()
     try:
         asyncio.run(assistant.run())
     except KeyboardInterrupt:
         print("\nAssistant stopped.")
+
+
+if __name__ == "__main__":
+    main()
