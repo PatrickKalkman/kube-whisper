@@ -4,14 +4,13 @@ from websockets.exceptions import ConnectionClosedError
 import websockets
 from kubewhisper.modules.logging import log_ws_event, log_warning, logger
 from kubewhisper.modules.websocket_manager import WebSocketManager
-from kubewhisper.modules.tools import function_map as base_function_map, tools as base_tools
 from kubewhisper.modules.kubernetes_tools import function_map as k8s_function_map, tools as k8s_tools
 from kubewhisper.modules.async_microphone import AsyncMicrophone
 from .event_handler import EventHandler
 
 # Combine function maps and tools
-function_map = {**base_function_map, **k8s_function_map}
-tools = base_tools + k8s_tools
+function_map = k8s_function_map
+tools = k8s_tools
 
 SESSION_INSTRUCTIONS = (
     "You are Kuby, a helpful assistant. Respond to Pat. "
