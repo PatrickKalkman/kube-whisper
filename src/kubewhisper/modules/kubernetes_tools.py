@@ -154,64 +154,64 @@ async def get_version_info():
         config.load_kube_config()
         version_api = client.VersionApi()
         core_api = client.CoreV1Api()
-        
+
         # Get API server version
         api_version = version_api.get_code()
-        
+
         # Get node versions
         nodes = core_api.list_node()
         node_versions = {}
         for node in nodes.items:
             version = node.status.node_info.kubelet_version
             node_versions[node.metadata.name] = version
-            
+
         return {
             "api_server": {
                 "version": api_version.git_version,
                 "platform": api_version.platform,
-                "build_date": api_version.build_date
+                "build_date": api_version.build_date,
             },
-            "nodes": node_versions
+            "nodes": node_versions,
         }
     except Exception as e:
         return {"error": f"Failed to get version info: {str(e)}"}
+
 
 async def get_kubernetes_latest_version_information() -> Dict[str, Any]:
     """Retrieves the latest stable version information from the Kubernetes GitHub repository."""
     try:
         async with aiohttp.ClientSession() as session:
             # Get releases from GitHub API
-            async with session.get('https://api.github.com/repos/kubernetes/kubernetes/releases') as response:
+            async with session.get("https://api.github.com/repos/kubernetes/kubernetes/releases") as response:
                 if response.status != 200:
                     return {"error": f"GitHub API request failed with status {response.status}"}
-                
+
                 releases = await response.json()
-                
+
                 # Filter and process releases
                 stable_releases = []
                 for release in releases:
-                    if not release['prerelease'] and not release['draft']:
-                        version = release['tag_name'].lstrip('v')
-                        published_at = release['published_at']
-                        stable_releases.append({
-                            "version": version,
-                            "published_at": published_at,
-                            "html_url": release['html_url']
-                        })
+                    if not release["prerelease"] and not release["draft"]:
+                        version = release["tag_name"].lstrip("v")
+                        published_at = release["published_at"]
+                        stable_releases.append(
+                            {"version": version, "published_at": published_at, "html_url": release["html_url"]}
+                        )
                         if len(stable_releases) >= 5:  # Get latest 5 stable releases
                             break
-                
+
                 if not stable_releases:
                     return {"error": "No stable releases found"}
-                
+
                 return {
-                    "latest_stable_version": stable_releases[0]['version'],
+                    "latest_stable_version": stable_releases[0]["version"],
                     "latest_releases": stable_releases,
-                    "retrieved_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    "retrieved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 }
-                
+
     except Exception as e:
         return {"error": f"Failed to get Kubernetes version information: {str(e)}"}
+
 
 async def get_available_clusters():
     """Returns a list of all available Kubernetes clusters from the kubeconfig."""
@@ -220,121 +220,119 @@ async def get_available_clusters():
         contexts, active_context = config.list_kube_config_contexts()
         if not contexts:
             return {"error": "No Kubernetes contexts found in kubeconfig"}
-            
+
         clusters = []
         active_cluster = None
-        
+
         for ctx in contexts:
             cluster_info = {
-                "name": ctx['context']['cluster'],
-                "context_name": ctx['name'],
-                "is_active": ctx == active_context
+                "name": ctx["context"]["cluster"],
+                "context_name": ctx["name"],
+                "is_active": ctx == active_context,
             }
             clusters.append(cluster_info)
             if cluster_info["is_active"]:
                 active_cluster = cluster_info
-                
-        return {
-            "clusters": clusters,
-            "active_cluster": active_cluster,
-            "total_clusters": len(clusters)
-        }
+
+        return {"clusters": clusters, "active_cluster": active_cluster, "total_clusters": len(clusters)}
     except config.config_exception.ConfigException as e:
         return {"error": f"Failed to get cluster information: {str(e)}"}
+
 
 async def switch_cluster(cluster_name: str):
     """Switch to a different Kubernetes cluster context and persist the change."""
     try:
         # Get all available contexts
         contexts, active_context = config.list_kube_config_contexts()
-        
+
         # Find the context that matches the requested cluster name
         target_context = None
         for ctx in contexts:
-            if ctx['context']['cluster'] == cluster_name:
-                target_context = ctx['name']
+            if ctx["context"]["cluster"] == cluster_name:
+                target_context = ctx["name"]
                 break
-                
+
         if not target_context:
             return {
                 "error": f"Cluster '{cluster_name}' not found in kubeconfig",
-                "available_clusters": [ctx['context']['cluster'] for ctx in contexts]
+                "available_clusters": [ctx["context"]["cluster"] for ctx in contexts],
             }
-            
+
         # Use the config module to directly modify current context
         config_file = os.path.expanduser(config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION)
         config.kube_config.load_kube_config()
-        
+
         # Load and modify the config file
         with open(config_file) as f:
             kube_config = yaml.safe_load(f)
-        
+
         # Update the current-context
-        kube_config['current-context'] = target_context
-        
+        kube_config["current-context"] = target_context
+
         # Save the changes back to the config file
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.safe_dump(kube_config, f)
-        
+
         # Load the new context for the current session
         config.load_kube_config(context=target_context)
-        
+
         return {
             "success": True,
             "message": f"Successfully switched to cluster '{cluster_name}' and persisted the change",
-            "context": target_context
+            "context": target_context,
         }
-        
+
     except config.config_exception.ConfigException as e:
         return {"error": f"Failed to switch cluster: {str(e)}"}
+
 
 async def get_cluster_name():
     """Returns the name of the current Kubernetes cluster."""
     try:
         # Load kube config
         config.load_kube_config()
-        
+
         # Get current context info
         contexts, active_context = config.list_kube_config_contexts()
         if not active_context:
             return {"error": "No active Kubernetes context found"}
-            
-        cluster_name = active_context['context']['cluster']
-        return {
-            "cluster_name": cluster_name,
-            "context_name": active_context['name']
-        }
+
+        cluster_name = active_context["context"]["cluster"]
+        return {"cluster_name": cluster_name, "context_name": active_context["name"]}
     except config.config_exception.ConfigException as e:
         return {"error": f"Failed to get cluster name: {str(e)}"}
+
 
 async def get_last_events():
     """Retrieve the message of the last four events in the cluster."""
     try:
         config.load_kube_config()
         v1 = client.CoreV1Api()
-        
+
         # Get last 4 events, sorted by last timestamp
         events = v1.list_event_for_all_namespaces(limit=4, _preload_content=False)
         events_data = json.loads(events.data)
-        
+
         # Extract relevant information
         event_messages = []
-        for event in events_data.get('items', []):
-            event_messages.append({
-                "type": event.get('type'),
-                "reason": event.get('reason'),
-                "message": event.get('message'),
-                "timestamp": event.get('lastTimestamp'),
-                "involved_object": {
-                    "kind": event.get('involvedObject', {}).get('kind'),
-                    "name": event.get('involvedObject', {}).get('name')
+        for event in events_data.get("items", []):
+            event_messages.append(
+                {
+                    "type": event.get("type"),
+                    "reason": event.get("reason"),
+                    "message": event.get("message"),
+                    "timestamp": event.get("lastTimestamp"),
+                    "involved_object": {
+                        "kind": event.get("involvedObject", {}).get("kind"),
+                        "name": event.get("involvedObject", {}).get("name"),
+                    },
                 }
-            })
-            
+            )
+
         return {
             "events": event_messages,
             "count": len(event_messages),
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
     except Exception as e:
         return {"error": f"Failed to get events: {str(e)}"}
@@ -458,12 +456,7 @@ tools = [
         "description": "Switch to a different Kubernetes cluster using its name.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "cluster_name": {
-                    "type": "string",
-                    "description": "The name of the cluster to switch to"
-                }
-            },
+            "properties": {"cluster_name": {"type": "string", "description": "The name of the cluster to switch to"}},
             "required": ["cluster_name"],
         },
     },
