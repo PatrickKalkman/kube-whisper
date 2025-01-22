@@ -210,6 +210,25 @@ async def get_kubernetes_latest_version_information() -> Dict[str, Any]:
     except Exception as e:
         return {"error": f"Failed to get Kubernetes version information: {str(e)}"}
 
+async def get_cluster_name():
+    """Returns the name of the current Kubernetes cluster."""
+    try:
+        # Load kube config
+        config.load_kube_config()
+        
+        # Get current context info
+        contexts, active_context = config.list_kube_config_contexts()
+        if not active_context:
+            return {"error": "No active Kubernetes context found"}
+            
+        cluster_name = active_context['context']['cluster']
+        return {
+            "cluster_name": cluster_name,
+            "context_name": active_context['name']
+        }
+    except config.config_exception.ConfigException as e:
+        return {"error": f"Failed to get cluster name: {str(e)}"}
+
 async def get_cluster_status():
     """Returns detailed status information about the Kubernetes cluster."""
     try:
@@ -304,10 +323,21 @@ function_map = {
     "analyze_deployment_logs": analyze_deployment_logs,
     "get_version_info": get_version_info,
     "get_kubernetes_latest_version_information": get_kubernetes_latest_version_information,
+    "get_cluster_name": get_cluster_name,
 }
 
 # Tools array for session initialization
 tools = [
+    {
+        "type": "function",
+        "name": "get_cluster_name",
+        "description": "Returns the name of the current Kubernetes cluster and its context.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
     {
         "type": "function",
         "name": "get_kubernetes_latest_version_information",
