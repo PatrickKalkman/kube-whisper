@@ -4,14 +4,16 @@ import time
 import base64
 import speech_recognition as sr
 from websockets.exceptions import ConnectionClosedError
-from kubewhisper.modules.logging import log_tool_call, log_error, log_info, log_warning
+import websockets
+from kubewhisper.modules.logging import log_ws_event, log_tool_call, log_error, log_info, log_warning
 from kubewhisper.modules.logging import logger
+from kubewhisper.utils.utils import log_runtime
 from kubewhisper.modules.websocket_manager import WebSocketManager
 from kubewhisper.modules.tools import function_map as base_function_map, tools as base_tools
 from kubewhisper.modules.kubernetes_tools import function_map as k8s_function_map, tools as k8s_tools
 from kubewhisper.modules.async_microphone import AsyncMicrophone
 from kubewhisper.modules.audio import play_audio
-from kubewhisper.utils.utils import base64_encode_audio, log_runtime
+from kubewhisper.modules.audio_manager import AudioManager
 
 # Combine function maps and tools
 function_map = {**base_function_map, **k8s_function_map}
@@ -19,7 +21,7 @@ tools = base_tools + k8s_tools
 
 SESSION_INSTRUCTIONS = (
     "You are Kuby, a helpful assistant. Respond to Pat. "
-    "Keep all of your responses ultra short. Say things like: "
+    "Keep all of your responses short. Say things like: "
     "'Task complete', 'There was an error', 'I need more information'."
 )
 PREFIX_PADDING_MS = 300
@@ -33,6 +35,7 @@ class SimpleAssistant:
         self.audio_chunks = []
         self.mic = AsyncMicrophone()
         self.exit_event = asyncio.Event()
+        self.audio_manager = AudioManager()
         self.ws_manager = WebSocketManager(openai_api_key, realtime_api_url)
 
         # Initialize state variables
@@ -46,37 +49,37 @@ class SimpleAssistant:
     async def run(self):
         while True:
             try:
-                headers = {
-                    "Authorization": f"Bearer {self.openai_api_key}",
-                    "OpenAI-Beta": "realtime=v1",
+                await self.ws_manager.connect()
+
+                session_config = {
+                    "modalities": ["text", "audio"],
+                    "instructions": SESSION_INSTRUCTIONS,
+                    "voice": "alloy",
+                    "input_audio_format": "pcm16",
+                    "output_audio_format": "pcm16",
+                    "turn_detection": {
+                        "type": "server_vad",
+                        "threshold": SILENCE_THRESHOLD,
+                        "prefix_padding_ms": PREFIX_PADDING_MS,
+                        "silence_duration_ms": SILENCE_DURATION_MS,
+                    },
+                    "tools": tools,
                 }
 
-                async with websockets.connect(
-                    self.realtime_api_url,
-                    additional_headers=headers,
-                    close_timeout=120,
-                    ping_interval=30,
-                    ping_timeout=10,
-                ) as ws:
-                    log_info("✅ Connected to the server.")
-                    await self.initialize_session(ws)
-                    ws_task = asyncio.create_task(self.process_ws_messages(ws))
+                await self.ws_manager.initialize_session(session_config)
+                ws_task = asyncio.create_task(self.process_ws_messages())
 
-                    logger.info("Conversation started. Speak freely, and the assistant will respond.")
-                    if self.prompts:
-                        await self.send_initial_prompts(ws)
-                    else:
-                        self.mic.start_recording()
-                        logger.info("Recording started. Listening for speech...")
+                logger.info("Conversation started. Speak freely, and the assistant will respond.")
+                if self.prompts:
+                    await self.send_initial_prompts()
+                else:
+                    self.mic.start_recording()
+                    logger.info("Recording started. Listening for speech...")
 
-                    await self.send_audio_loop(ws)
-
-                    logger.info("before await ws_task")
-
-                    await ws_task
-
-                    logger.info("await ws_task complete")
+                await self.send_audio_loop()
+                await ws_task
                 break
+
             except ConnectionClosedError as e:
                 if "keepalive ping timeout" in str(e):
                     logger.warning("WebSocket connection lost due to keepalive ping timeout. Reconnecting...")
@@ -91,27 +94,7 @@ class SimpleAssistant:
             finally:
                 self.mic.stop_recording()
                 self.mic.close()
-
-    async def initialize_session(self, websocket):
-        session_update = {
-            "type": "session.update",
-            "session": {
-                "modalities": ["text", "audio"],
-                "instructions": SESSION_INSTRUCTIONS,
-                "voice": "alloy",
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
-                "turn_detection": {
-                    "type": "server_vad",
-                    "threshold": SILENCE_THRESHOLD,
-                    "prefix_padding_ms": PREFIX_PADDING_MS,
-                    "silence_duration_ms": SILENCE_DURATION_MS,
-                },
-                "tools": tools,
-            },
-        }
-        log_ws_event("Outgoing", session_update)
-        await websocket.send(json.dumps(session_update))
+                await self.ws_manager.close()
 
     def get_user_voice_input(self):
         print("Listening for your command...")
@@ -124,41 +107,22 @@ class SimpleAssistant:
                 print("Sorry, I couldn't understand that.")
                 return None
 
-    async def process_ws_messages(self, websocket):
+    async def process_ws_messages(self):
         while True:
             try:
-                message = await websocket.recv()
-                event = json.loads(message)
+                event = await self.ws_manager.receive_message()
                 log_ws_event("Incoming", event)
-                await self.handle_event(event, websocket)
+                await self.handle_event(event)
             except websockets.ConnectionClosed:
                 log_warning("⚠️ WebSocket connection lost.")
                 break
 
-    async def send_user_input(self, websocket, user_input):
-        event = {
-            "type": "conversation.item.create",
-            "item": {
-                "type": "message",
-                "role": "user",
-                "content": [{"type": "input_text", "text": user_input}],
-            },
-        }
-        await websocket.send(json.dumps(event))
-        await websocket.send(json.dumps({"type": "response.create"}))
+    async def send_user_input(self, user_input):
+        await self.ws_manager.send_user_input(user_input)
         print("Sent input to assistant.")
 
-    async def send_error_message_to_assistant(self, error_message, websocket):
-        error_item = {
-            "type": "conversation.item.create",
-            "item": {
-                "type": "message",
-                "role": "assistant",
-                "content": [{"type": "text", "text": error_message}],
-            },
-        }
-        log_ws_event("Outgoing", error_item)
-        await websocket.send(json.dumps(error_item))
+    async def send_error_message_to_assistant(self, error_message):
+        await self.ws_manager.send_error_message(error_message)
 
     async def handle_response_done(self):
         if self.response_start_time is not None:
@@ -178,7 +142,7 @@ class SimpleAssistant:
         logger.info("Calling stop_receiving()")
         self.mic.stop_receiving()
 
-    async def handle_event(self, event, websocket):
+    async def handle_event(self, event):
         event_type = event.get("type")
         if event_type == "response.created":
             self.mic.start_receiving()
@@ -188,7 +152,7 @@ class SimpleAssistant:
         elif event_type == "response.function_call_arguments.delta":
             self.function_call_args += event.get("delta", "")
         elif event_type == "response.function_call_arguments.done":
-            await self.handle_function_call(event, websocket)
+            await self.handle_function_call(event)
         elif event_type == "response.text.delta":
             delta = event.get("delta", "")
             self.assistant_reply += delta
@@ -198,11 +162,11 @@ class SimpleAssistant:
         elif event_type == "response.done":
             await self.handle_response_done()
         elif event_type == "error":
-            await self.handle_error(event, websocket)
+            await self.handle_error(event)
         elif event_type == "input_audio_buffer.speech_started":
             logger.info("Speech detected, listening...")
         elif event_type == "input_audio_buffer.speech_stopped":
-            await self.handle_speech_stopped(websocket)
+            await self.handle_speech_stopped()
         elif event_type == "rate_limits.updated":
             self.response_in_progress = False
             self.mic.is_recording = True
@@ -214,7 +178,7 @@ class SimpleAssistant:
             self.function_call = item
             self.function_call_args = ""
 
-    async def handle_function_call(self, event, websocket):
+    async def handle_function_call(self, event):
         if self.function_call:
             function_name = self.function_call.get("name")
             call_id = self.function_call.get("call_id")
@@ -223,9 +187,9 @@ class SimpleAssistant:
                 args = json.loads(self.function_call_args) if self.function_call_args else {}
             except json.JSONDecodeError:
                 args = {}
-            await self.execute_function_call(function_name, call_id, args, websocket)
+            await self.execute_function_call(function_name, call_id, args)
 
-    async def execute_function_call(self, function_name, call_id, args, websocket):
+    async def execute_function_call(self, function_name, call_id, args):
         if function_name in function_map:
             try:
                 result = await function_map[function_name](**args)
@@ -234,30 +198,20 @@ class SimpleAssistant:
                 error_message = f"Error executing function '{function_name}': {str(e)}"
                 log_error(error_message)
                 result = {"error": error_message}
-                await self.send_error_message_to_assistant(error_message, websocket)
+                await self.send_error_message_to_assistant(error_message)
         else:
             error_message = f"Function '{function_name}' not found. Add to function_map in tools.py."
             log_error(error_message)
             result = {"error": error_message}
-            await self.send_error_message_to_assistant(error_message, websocket)
+            await self.send_error_message_to_assistant(error_message)
 
-        function_call_output = {
-            "type": "conversation.item.create",
-            "item": {
-                "type": "function_call_output",
-                "call_id": call_id,
-                "output": json.dumps(result),
-            },
-        }
-        log_ws_event("Outgoing", function_call_output)
-        await websocket.send(json.dumps(function_call_output))
-        await websocket.send(json.dumps({"type": "response.create"}))
+        await self.ws_manager.send_function_call_output(call_id, result)
 
         # Reset function call state
         self.function_call = None
         self.function_call_args = ""
 
-    async def handle_error(self, event, websocket):
+    async def handle_error(self, event):
         error_message = event.get("error", {}).get("message", "")
         log_error(f"Error: {error_message}")
         if "buffer is empty" in error_message:
@@ -268,29 +222,22 @@ class SimpleAssistant:
         else:
             logger.error(f"Unhandled error: {error_message}")
 
-    async def handle_speech_stopped(self, websocket):
+    async def handle_speech_stopped(self):
         self.mic.stop_recording()
         logger.info("Speech ended, processing...")
         self.response_start_time = time.perf_counter()
-        await websocket.send(json.dumps({"type": "input_audio_buffer.commit"}))
+        await self.ws_manager.send_message({"type": "input_audio_buffer.commit"})
 
-    async def send_audio_loop(self, websocket):
+    async def send_audio_loop(self):
         try:
             while not self.exit_event.is_set():
                 await asyncio.sleep(0.1)  # Small delay to accumulate audio data
                 if not self.mic.is_receiving:
                     audio_data = self.mic.get_audio_data()
                     if audio_data and len(audio_data) > 0:
-                        base64_audio = base64_encode_audio(audio_data)
-                        if base64_audio:
-                            audio_event = {
-                                "type": "input_audio_buffer.append",
-                                "audio": base64_audio,
-                            }
-                            log_ws_event("Outgoing", audio_event)
-                            await websocket.send(json.dumps(audio_event))
-                        else:
-                            logger.debug("No audio data to send")
+                        await self.ws_manager.send_audio_data(audio_data)
+                    else:
+                        logger.debug("No audio data to send")
                 else:
                     await asyncio.sleep(0.1)  # Wait while receiving assistant response
         except KeyboardInterrupt:
@@ -299,4 +246,4 @@ class SimpleAssistant:
             self.exit_event.set()
             self.mic.stop_recording()
             self.mic.close()
-            await websocket.close()
+            await self.ws_manager.close()

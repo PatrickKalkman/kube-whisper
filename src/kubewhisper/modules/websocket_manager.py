@@ -3,6 +3,7 @@ import websockets
 from kubewhisper.modules.logging import log_info, log_ws_event
 from kubewhisper.utils.utils import base64_encode_audio
 
+
 class WebSocketManager:
     def __init__(self, openai_api_key, realtime_api_url):
         self.openai_api_key = openai_api_key
@@ -28,10 +29,7 @@ class WebSocketManager:
 
     async def initialize_session(self, session_config):
         """Initialize the WebSocket session with configuration"""
-        session_update = {
-            "type": "session.update",
-            "session": session_config
-        }
+        session_update = {"type": "session.update", "session": session_config}
         log_ws_event("Outgoing", session_update)
         await self.send_message(session_update)
 
@@ -40,6 +38,13 @@ class WebSocketManager:
         if not self.websocket:
             raise ConnectionError("WebSocket not connected")
         await self.websocket.send(json.dumps(message))
+
+    async def receive_message(self):
+        """Receive a message from the WebSocket"""
+        if not self.websocket:
+            raise ConnectionError("WebSocket not connected")
+        message = await self.websocket.recv()
+        return json.loads(message)
 
     async def send_audio_data(self, audio_data):
         """Send audio data through the WebSocket"""
@@ -98,10 +103,3 @@ class WebSocketManager:
         if self.websocket:
             await self.websocket.close()
             self.websocket = None
-
-    async def receive_message(self):
-        """Receive a message from the WebSocket"""
-        if not self.websocket:
-            raise ConnectionError("WebSocket not connected")
-        message = await self.websocket.recv()
-        return json.loads(message)
