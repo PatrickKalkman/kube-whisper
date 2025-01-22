@@ -2,6 +2,7 @@ import datetime
 import re
 from collections import defaultdict
 import aiohttp
+import yaml
 from kubernetes import client, config
 from typing import Dict, Any
 
@@ -258,20 +259,20 @@ async def switch_cluster(cluster_name: str):
                 "available_clusters": [ctx['context']['cluster'] for ctx in contexts]
             }
             
-        # Load the current kubeconfig
+        # Use the config module to directly modify current context
         config_file = config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION
-        kube_config = config.kube_config.KubeConfigLoader(
-            config_file=config_file
-        ).load_and_merge()
+        config.kube_config.load_kube_config()
+        
+        # Load and modify the config file
+        with open(config_file) as f:
+            kube_config = yaml.safe_load(f)
         
         # Update the current-context
         kube_config['current-context'] = target_context
         
-        # Save the updated config back to file
-        config.kube_config.KubeConfigMerger(
-            config_file,
-            config_dict=kube_config
-        ).save()
+        # Save the changes back to the config file
+        with open(config_file, 'w') as f:
+            yaml.safe_dump(kube_config, f)
         
         # Load the new context for the current session
         config.load_kube_config(context=target_context)
