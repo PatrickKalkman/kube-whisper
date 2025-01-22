@@ -83,7 +83,7 @@ class SimpleAssistant:
                     ping_interval=30,
                     ping_timeout=10,
                 ) as ws:
-                    log_info("✅ Connected to the server.", style="bold green")
+                    log_info("✅ Connected to the server.")
                     await self.initialize_session(ws)
                     ws_task = asyncio.create_task(self.process_ws_messages(ws))
 
@@ -192,7 +192,7 @@ class SimpleAssistant:
             log_runtime("realtime_api_response", response_duration)
             self.response_start_time = None
 
-        log_info("Assistant response complete.", style="bold blue")
+        log_info("Assistant response complete.")
         if self.audio_chunks:
             audio_data = b"".join(self.audio_chunks)
             logger.info(f"Sending {len(audio_data)} bytes of audio data to play_audio()")
