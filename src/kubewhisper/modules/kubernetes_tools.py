@@ -239,6 +239,37 @@ async def get_available_clusters():
     except config.config_exception.ConfigException as e:
         return {"error": f"Failed to get cluster information: {str(e)}"}
 
+async def switch_cluster(cluster_name: str):
+    """Switch to a different Kubernetes cluster context."""
+    try:
+        # Get all available contexts
+        contexts, active_context = config.list_kube_config_contexts()
+        
+        # Find the context that matches the requested cluster name
+        target_context = None
+        for ctx in contexts:
+            if ctx['context']['cluster'] == cluster_name:
+                target_context = ctx['name']
+                break
+                
+        if not target_context:
+            return {
+                "error": f"Cluster '{cluster_name}' not found in kubeconfig",
+                "available_clusters": [ctx['context']['cluster'] for ctx in contexts]
+            }
+            
+        # Switch to the target context
+        config.load_kube_config(context=target_context)
+        
+        return {
+            "success": True,
+            "message": f"Successfully switched to cluster '{cluster_name}'",
+            "context": target_context
+        }
+        
+    except config.config_exception.ConfigException as e:
+        return {"error": f"Failed to switch cluster: {str(e)}"}
+
 async def get_cluster_name():
     """Returns the name of the current Kubernetes cluster."""
     try:
@@ -354,10 +385,26 @@ function_map = {
     "get_kubernetes_latest_version_information": get_kubernetes_latest_version_information,
     "get_cluster_name": get_cluster_name,
     "get_available_clusters": get_available_clusters,
+    "switch_cluster": switch_cluster,
 }
 
 # Tools array for session initialization
 tools = [
+    {
+        "type": "function",
+        "name": "switch_cluster",
+        "description": "Switch to a different Kubernetes cluster using its name.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "cluster_name": {
+                    "type": "string",
+                    "description": "The name of the cluster to switch to"
+                }
+            },
+            "required": ["cluster_name"],
+        },
+    },
     {
         "type": "function",
         "name": "get_available_clusters",
