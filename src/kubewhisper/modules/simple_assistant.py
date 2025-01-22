@@ -88,7 +88,7 @@ class SimpleAssistant:
         try:
             while not self.exit_event.is_set():
                 await asyncio.sleep(0.1)  # Small delay to accumulate audio data
-                if not self.mic.is_receiving:
+                if not self.mic.is_receiving():
                     audio_data = self.mic.get_audio_data()
                     if audio_data and len(audio_data) > 0:
                         await self.ws_manager.send_audio_data(audio_data)
