@@ -7,6 +7,8 @@ from kubewhisper.modules.websocket_manager import WebSocketManager
 from kubewhisper.modules.kubernetes_tools import function_map as k8s_function_map, tools as k8s_tools
 from kubewhisper.modules.async_microphone import AsyncMicrophone
 from .event_handler import EventHandler
+from .audio_manager import AudioManager
+from .config import Config
 
 # Combine function maps and tools
 function_map = k8s_function_map
@@ -31,28 +33,13 @@ class SimpleAssistant:
         self.event_handler = EventHandler(self.mic, self.ws_manager, function_map)
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
+        self.audio_manager = AudioManager()
 
     async def run(self):
         while True:
             try:
                 await self.ws_manager.connect()
-
-                session_config = {
-                    "modalities": ["text", "audio"],
-                    "instructions": SESSION_INSTRUCTIONS,
-                    "voice": "sage",
-                    "input_audio_format": "pcm16",
-                    "output_audio_format": "pcm16",
-                    "turn_detection": {
-                        "type": "server_vad",
-                        "threshold": SILENCE_THRESHOLD,
-                        "prefix_padding_ms": PREFIX_PADDING_MS,
-                        "silence_duration_ms": SILENCE_DURATION_MS,
-                    },
-                    "tools": tools,
-                }
-
-                await self.ws_manager.initialize_session(session_config)
+                await self.initialize_session()
                 ws_task = asyncio.create_task(self.process_ws_messages())
 
                 logger.info("Conversation started. Speak freely, and the assistant will respond.")
@@ -66,21 +53,42 @@ class SimpleAssistant:
                 await ws_task
                 break
 
-            except ConnectionClosedError as e:
-                if "keepalive ping timeout" in str(e):
-                    logger.warning("WebSocket connection lost due to keepalive ping timeout. Reconnecting...")
-                    await asyncio.sleep(1)
-                    continue
-                else:
-                    logger.exception("WebSocket connection closed unexpectedly.")
-                    break
             except Exception as e:
-                logger.exception(f"An unexpected error occurred: {e}")
-                break
+                should_continue = await self.handle_connection_error(e)
+                if not should_continue:
+                    break
             finally:
                 self.mic.stop_recording()
                 self.mic.close()
                 await self.ws_manager.close()
+
+    async def initialize_session(self):
+        session_config = {
+            "modalities": ["text", "audio"],
+            "instructions": Config.SESSION_INSTRUCTIONS,
+            "voice": "sage",
+            "input_audio_format": "pcm16",
+            "output_audio_format": "pcm16",
+            "turn_detection": {
+                "type": "server_vad",
+                "threshold": Config.SILENCE_THRESHOLD,
+                "prefix_padding_ms": Config.PREFIX_PADDING_MS,
+                "silence_duration_ms": Config.SILENCE_DURATION_MS,
+            },
+            "tools": tools,
+        }
+        await self.ws_manager.initialize_session(session_config)
+
+    async def handle_connection_error(self, error):
+        if isinstance(error, ConnectionClosedError):
+            if "keepalive ping timeout" in str(error):
+                logger.warning("WebSocket connection lost due to keepalive ping timeout. Reconnecting...")
+                await asyncio.sleep(1)
+                return True
+            logger.exception("WebSocket connection closed unexpectedly.")
+        else:
+            logger.exception(f"An unexpected error occurred: {error}")
+        return False
 
     def get_user_voice_input(self):
         print("Listening for your command...")
