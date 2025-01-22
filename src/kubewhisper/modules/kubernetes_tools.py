@@ -1,4 +1,6 @@
 import datetime
+import re
+from collections import defaultdict
 from kubernetes import client, config
 
 
@@ -51,6 +53,99 @@ async def get_number_of_namespaces():
         return {"namespace_count": len(namespaces.items)}
     except Exception as e:
         return {"error": f"Failed to get namespace count: {str(e)}"}
+
+
+async def analyze_deployment_logs(deployment_name: str, namespace: str = "default"):
+    """Analyze logs from all pods in a deployment for criticals/errors/warnings in the last hour."""
+    try:
+        config.load_kube_config()
+        core_v1 = client.CoreV1Api()
+        apps_v1 = client.AppsV1Api()
+
+        # Get pods from deployment
+        deployment = apps_v1.read_namespaced_deployment(
+            name=deployment_name,
+            namespace=namespace
+        )
+        
+        # Get label selector
+        selector = deployment.spec.selector.match_labels
+        label_selector = ",".join([f"{k}={v}" for k, v in selector.items()])
+        
+        # Get pods with this selector
+        pods = core_v1.list_namespaced_pod(
+            namespace=namespace,
+            label_selector=label_selector
+        )
+        
+        error_patterns = {
+            "exception": r"(?i)(exception|error|failure|failed|traceback)",
+            "warning": r"(?i)(warning|warn)",
+            "critical": r"(?i)(critical|fatal|panic)",
+            "timeout": r"(?i)(timeout|timed out)",
+            "connection": r"(?i)(connection refused|connection reset|connection closed)",
+            "permission": r"(?i)(permission denied|unauthorized|forbidden)",
+            "memory": r"(?i)(out of memory|memory limit)",
+            "disk": r"(?i)(disk full|no space left)"
+        }
+
+        errors = defaultdict(list)
+        error_counts = defaultdict(int)
+        total_errors = 0
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        time_threshold = current_time - datetime.timedelta(minutes=60)
+
+        for pod in pods.items:
+            try:
+                logs = core_v1.read_namespaced_pod_log(
+                    name=pod.metadata.name,
+                    namespace=namespace,
+                    tail_lines=1000,
+                    timestamps=True
+                )
+                
+                for line in logs.split('\n'):
+                    if not line.strip():
+                        continue
+
+                    try:
+                        # Split timestamp and log message
+                        timestamp_str = line.split()[0]
+                        timestamp = datetime.datetime.fromisoformat(timestamp_str.rstrip('Z')).replace(tzinfo=datetime.timezone.utc)
+                        
+                        # Check if log is within time window
+                        if timestamp < time_threshold:
+                            continue
+
+                        # Check for different error patterns
+                        for error_type, pattern in error_patterns.items():
+                            if re.search(pattern, line):
+                                errors[error_type].append({
+                                    "timestamp": timestamp_str,
+                                    "message": line.strip(),
+                                    "age_minutes": round((current_time - timestamp).total_seconds() / 60, 1)
+                                })
+                                error_counts[error_type] += 1
+                                total_errors += 1
+
+                    except Exception:
+                        continue
+
+            except Exception as e:
+                errors["pod_access_errors"].append(f"Could not access logs for pod {pod.metadata.name}: {str(e)}")
+
+        return {
+            "summary": {
+                "total_errors": total_errors,
+                "error_types": dict(error_counts),
+                "pods_analyzed": len(pods.items),
+                "time_window_minutes": 60
+            },
+            "detailed_errors": dict(errors)
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to analyze logs: {str(e)}"}
 
 
 async def get_cluster_status():
@@ -161,10 +256,31 @@ function_map = {
     "get_number_of_pods": get_number_of_pods,
     "get_number_of_namespaces": get_number_of_namespaces,
     "get_cluster_status": get_cluster_status,
+    "analyze_deployment_logs": analyze_deployment_logs,
 }
 
 # Tools array for session initialization
 tools = [
+    {
+        "type": "function",
+        "name": "analyze_deployment_logs",
+        "description": "Analyzes logs from all pods in a deployment for criticals/errors/warnings in the last hour.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "deployment_name": {
+                    "type": "string",
+                    "description": "The name of the deployment to analyze"
+                },
+                "namespace": {
+                    "type": "string",
+                    "description": "The namespace of the deployment",
+                    "default": "default"
+                }
+            },
+            "required": ["deployment_name"]
+        },
+    },
     {
         "type": "function",
         "name": "get_number_of_nodes",
