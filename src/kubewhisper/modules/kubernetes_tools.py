@@ -1,7 +1,9 @@
 import datetime
 import re
 from collections import defaultdict
+import aiohttp
 from kubernetes import client, config
+from typing import Dict, Any
 
 
 async def get_number_of_nodes():
