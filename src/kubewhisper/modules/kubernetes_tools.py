@@ -1,5 +1,6 @@
 import datetime
 import re
+import os
 from collections import defaultdict
 import aiohttp
 import yaml
@@ -260,7 +261,7 @@ async def switch_cluster(cluster_name: str):
             }
             
         # Use the config module to directly modify current context
-        config_file = config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION
+        config_file = os.path.expanduser(config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION)
         config.kube_config.load_kube_config()
         
         # Load and modify the config file
