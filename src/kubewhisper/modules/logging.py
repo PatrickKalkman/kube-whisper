@@ -5,10 +5,7 @@ logger.remove()  # Remove default handler
 
 # Add console output
 logger.add(
-    sink=lambda msg: print(msg),
-    format="<level>{time:HH:mm:ss}</level> | {message}",
-    colorize=True,
-    level="INFO"
+    sink=lambda msg: print(msg), format="<level>{time:HH:mm:ss}</level> | {message}", colorize=True, level="INFO"
 )
 
 # Add file output with rotation
@@ -18,7 +15,7 @@ logger.add(
     retention="1 week",  # Keep logs for 1 week
     compression="zip",  # Compress rotated logs
     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
-    level="INFO"
+    level="INFO",
 )
 
 
