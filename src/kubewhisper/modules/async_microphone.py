@@ -43,8 +43,15 @@ class AsyncMicrophone:
         logging.info("Started receiving assistant response")
 
     def stop_receiving(self):
-        self.is_receiving = False
-        logging.info("Stopped receiving assistant response")
+        try:
+            if self.is_receiving:
+                self.is_receiving = False
+                logging.info("Stopped receiving assistant response")
+            else:
+                logging.debug("Already not receiving, no action taken")
+        except Exception as e:
+            logging.error(f"Error stopping receiving: {str(e)}")
+            raise
 
     def get_audio_data(self):
         data = b""
