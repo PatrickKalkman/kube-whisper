@@ -2,7 +2,8 @@ import asyncio
 import json
 import time
 import websockets
-from datetime import datetime
+import base64
+import speech_recognition as sr
 from websockets.exceptions import ConnectionClosedError
 from kubewhisper.modules.logging import log_tool_call, log_error, log_info, log_warning
 from kubewhisper.modules.logging import logger, log_ws_event
@@ -27,11 +28,13 @@ SILENCE_DURATION_MS = 700
 
 
 class SimpleAssistant:
-    def __init__(self):
+    def __init__(self, openai_api_key, realtime_api_url):
         self.prompts = []
         self.audio_chunks = []
         self.mic = AsyncMicrophone()
         self.exit_event = asyncio.Event()
+        self.openai_api_key = openai_api_key
+        self.realtime_api_url = realtime_api_url
 
         # Initialize state variables
         self.assistant_reply = ""
@@ -45,12 +48,12 @@ class SimpleAssistant:
         while True:
             try:
                 headers = {
-                    "Authorization": f"Bearer {API_KEY}",
+                    "Authorization": f"Bearer {self.openai_api_key}",
                     "OpenAI-Beta": "realtime=v1",
                 }
 
                 async with websockets.connect(
-                    REALTIME_API_URL,
+                    self.realtime_api_url,
                     additional_headers=headers,
                     close_timeout=120,
                     ping_interval=30,

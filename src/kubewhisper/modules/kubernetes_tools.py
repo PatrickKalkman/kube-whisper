@@ -63,17 +63,15 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
         apps_v1 = client.AppsV1Api()
 
         # Get pods from deployment
-        deployment = apps_v1.read_namespaced_deployment(
-            name=deployment_name, namespace=namespace)
-        
+        deployment = apps_v1.read_namespaced_deployment(name=deployment_name, namespace=namespace)
+
         # Get label selector
         selector = deployment.spec.selector.match_labels
         label_selector = ",".join([f"{k}={v}" for k, v in selector.items()])
-        
+
         # Get pods with this selector
-        pods = core_v1.list_namespaced_pod(
-            namespace=namespace, label_selector=label_selector)
-        
+        pods = core_v1.list_namespaced_pod(namespace=namespace, label_selector=label_selector)
+
         error_patterns = {
             "exception": r"(?i)(exception|error|failure|failed|traceback)",
             "warning": r"(?i)(warning|warn)",
@@ -82,7 +80,7 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
             "connection": r"(?i)(connection refused|connection reset|connection closed)",
             "permission": r"(?i)(permission denied|unauthorized|forbidden)",
             "memory": r"(?i)(out of memory|memory limit)",
-            "disk": r"(?i)(disk full|no space left)"
+            "disk": r"(?i)(disk full|no space left)",
         }
 
         errors = defaultdict(list)
@@ -94,21 +92,20 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
         for pod in pods.items:
             try:
                 logs = core_v1.read_namespaced_pod_log(
-                    name=pod.metadata.name,
-                    namespace=namespace,
-                    tail_lines=1000,
-                    timestamps=True
+                    name=pod.metadata.name, namespace=namespace, tail_lines=1000, timestamps=True
                 )
-                
-                for line in logs.split('\n'):
+
+                for line in logs.split("\n"):
                     if not line.strip():
                         continue
 
                     try:
                         # Split timestamp and log message
                         timestamp_str = line.split()[0]
-                        timestamp = datetime.datetime.fromisoformat(timestamp_str.rstrip('Z')).replace(tzinfo=datetime.timezone.utc)
-                        
+                        timestamp = datetime.datetime.fromisoformat(timestamp_str.rstrip("Z")).replace(
+                            tzinfo=datetime.timezone.utc
+                        )
+
                         # Check if log is within time window
                         if timestamp < time_threshold:
                             continue
@@ -120,8 +117,7 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
                                     {
                                         "timestamp": timestamp_str,
                                         "message": line.strip(),
-                                        "age_minutes": round(
-                                            (current_time - timestamp).total_seconds() / 60, 1)
+                                        "age_minutes": round((current_time - timestamp).total_seconds() / 60, 1),
                                     }
                                 )
                                 error_counts[error_type] += 1
@@ -131,17 +127,16 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
                         continue
 
             except Exception as e:
-                errors["pod_access_errors"].append(
-                    f"Could not access logs for pod {pod.metadata.name}: {str(e)}")
+                errors["pod_access_errors"].append(f"Could not access logs for pod {pod.metadata.name}: {str(e)}")
 
         return {
             "summary": {
                 "total_errors": total_errors,
                 "error_types": dict(error_counts),
                 "pods_analyzed": len(pods.items),
-                "time_window_minutes": 60
+                "time_window_minutes": 60,
             },
-            "detailed_errors": dict(errors)
+            "detailed_errors": dict(errors),
         }
 
     except Exception as e:
@@ -153,101 +148,84 @@ async def get_cluster_status():
     try:
         # Load kube config
         config.load_kube_config()
-        
+
         # Initialize API clients
         v1 = client.CoreV1Api()
         custom = client.CustomObjectsApi()
-        
+
         # Get nodes info
         nodes = v1.list_node()
         node_count = len(nodes.items)
-        
+
         # Get metrics using metrics API
-        metrics = custom.list_cluster_custom_object(
-            group="metrics.k8s.io", version="v1beta1", plural="nodes")
-        
+        metrics = custom.list_cluster_custom_object(group="metrics.k8s.io", version="v1beta1", plural="nodes")
+
         # Calculate resource usage
         total_cpu_usage = 0
         total_memory_usage = 0
-        for item in metrics['items']:
-            cpu = item['usage']['cpu']
-            memory = item['usage']['memory']
+        for item in metrics["items"]:
+            cpu = item["usage"]["cpu"]
+            memory = item["usage"]["memory"]
             # Convert CPU from 'n' format to percentage
-            total_cpu_usage += int(cpu.rstrip('n')) / 1000000000 * 100
-            
+            total_cpu_usage += int(cpu.rstrip("n")) / 1000000000 * 100
+
             # Convert memory to bytes
-            if memory.endswith('Ki'):
-                memory_bytes = float(memory.rstrip('Ki')) * 1024
-            elif memory.endswith('Mi'):
-                memory_bytes = float(memory.rstrip('Mi')) * 1024 * 1024
-            elif memory.endswith('Gi'):
-                memory_bytes = float(memory.rstrip('Gi')) * 1024 * 1024 * 1024
-            elif memory.endswith('Ti'):
-                memory_bytes = float(memory.rstrip('Ti')) * 1024 * 1024 * 1024 * 1024
+            if memory.endswith("Ki"):
+                memory_bytes = float(memory.rstrip("Ki")) * 1024
+            elif memory.endswith("Mi"):
+                memory_bytes = float(memory.rstrip("Mi")) * 1024 * 1024
+            elif memory.endswith("Gi"):
+                memory_bytes = float(memory.rstrip("Gi")) * 1024 * 1024 * 1024
+            elif memory.endswith("Ti"):
+                memory_bytes = float(memory.rstrip("Ti")) * 1024 * 1024 * 1024 * 1024
             else:
                 # Assume it's in bytes if no suffix
                 memory_bytes = float(memory)
-            
+
             # Convert to GB
             total_memory_usage += memory_bytes / (1024 * 1024 * 1024)
-            
+
         avg_cpu = total_cpu_usage / node_count if node_count > 0 else 0
         avg_memory = total_memory_usage / node_count if node_count > 0 else 0
-        
+
         # Get pods across all namespaces
         pods = v1.list_pod_for_all_namespaces()
         pod_status = {}
         total_pods = 0
-        
+
         for pod in pods.items:
             status = pod.status.phase
             pod_status[status] = pod_status.get(status, 0) + 1
             total_pods += 1
-            
+
         # Get recent events (last 15 minutes)
         events = v1.list_event_for_all_namespaces()
         recent_issues = []
         fifteen_mins_ago = datetime.datetime.now(datetime.timezone.utc).timestamp() - (15 * 60)
-        
+
         for event in events.items:
-            if (event.type == "Warning" and 
-                event.last_timestamp and 
-                event.last_timestamp.timestamp() > fifteen_mins_ago):
+            if event.type == "Warning" and event.last_timestamp and event.last_timestamp.timestamp() > fifteen_mins_ago:
                 recent_issues.append(
-                    {
-                        "reason": event.reason,
-                        "message": event.message,
-                        "component": event.involved_object.kind
-                    }
+                    {"reason": event.reason, "message": event.message, "component": event.involved_object.kind}
                 )
-        
+
         # Prepare status response
         status_response = {
             "cluster_health": {
                 "total_nodes": node_count,
                 "avg_cpu_usage": f"{avg_cpu:.1f}%",
                 "avg_memory_usage": f"{avg_memory:.1f}GB",
-                "pod_count": {
-                    "total": total_pods,
-                    **pod_status
-                }
+                "pod_count": {"total": total_pods, **pod_status},
             },
-            "recent_issues": {
-                "count": len(recent_issues),
-                "summary": recent_issues
-            } if recent_issues else None,
-            "status_summary": ("Issues Detected" 
-                if recent_issues else "All Systems Normal"),
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            "recent_issues": {"count": len(recent_issues), "summary": recent_issues} if recent_issues else None,
+            "status_summary": ("Issues Detected" if recent_issues else "All Systems Normal"),
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
-        
+
         return status_response
-        
+
     except Exception as e:
-        return {
-            "error": "Failed to get cluster status",
-            "message": str(e)
-        }
+        return {"error": "Failed to get cluster status", "message": str(e)}
 
 
 # Map function names to their corresponding functions
@@ -264,24 +242,14 @@ tools = [
     {
         "type": "function",
         "name": "analyze_deployment_logs",
-        "description": (
-            "Analyzes logs from all pods in a deployment for "
-            "criticals/errors/warnings in the last hour."
-        ),
+        "description": ("Analyzes logs from all pods in a deployment for criticals/errors/warnings in the last hour."),
         "parameters": {
             "type": "object",
             "properties": {
-                "deployment_name": {
-                    "type": "string",
-                    "description": "The name of the deployment to analyze"
-                },
-                "namespace": {
-                    "type": "string",
-                    "description": "The namespace of the deployment",
-                    "default": "default"
-                }
+                "deployment_name": {"type": "string", "description": "The name of the deployment to analyze"},
+                "namespace": {"type": "string", "description": "The namespace of the deployment", "default": "default"},
             },
-            "required": ["deployment_name"]
+            "required": ["deployment_name"],
         },
     },
     {
