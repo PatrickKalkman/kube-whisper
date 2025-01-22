@@ -5,7 +5,7 @@ import websockets
 from kubewhisper.modules.logging import log_ws_event, log_warning, logger
 from kubewhisper.modules.websocket_manager import WebSocketManager
 from kubewhisper.modules.kubernetes_tools import function_map as k8s_function_map, tools as k8s_tools
-from kubewhisper.modules.async_microphone import AsyncMicrophone
+from kubewhisper.modules.async_microphone import AsyncMicrophone, MicrophoneState
 from kubewhisper.modules.session_config import SessionConfig
 from .event_handler import EventHandler
 
@@ -88,7 +88,7 @@ class SimpleAssistant:
         try:
             while not self.exit_event.is_set():
                 await asyncio.sleep(0.1)  # Small delay to accumulate audio data
-                if not self.mic.is_receiving():
+                if self.mic.state != MicrophoneState.RECEIVING:
                     audio_data = self.mic.get_audio_data()
                     if audio_data and len(audio_data) > 0:
                         await self.ws_manager.send_audio_data(audio_data)
