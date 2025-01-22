@@ -82,8 +82,22 @@ async def get_cluster_status():
             memory = item['usage']['memory']
             # Convert CPU from 'n' format to percentage
             total_cpu_usage += int(cpu.rstrip('n')) / 1000000000 * 100
-            # Convert memory from Ki to GB
-            total_memory_usage += int(memory.rstrip('Ki')) / 1024 / 1024
+            
+            # Convert memory to bytes
+            if memory.endswith('Ki'):
+                memory_bytes = float(memory.rstrip('Ki')) * 1024
+            elif memory.endswith('Mi'):
+                memory_bytes = float(memory.rstrip('Mi')) * 1024 * 1024
+            elif memory.endswith('Gi'):
+                memory_bytes = float(memory.rstrip('Gi')) * 1024 * 1024 * 1024
+            elif memory.endswith('Ti'):
+                memory_bytes = float(memory.rstrip('Ti')) * 1024 * 1024 * 1024 * 1024
+            else:
+                # Assume it's in bytes if no suffix
+                memory_bytes = float(memory)
+            
+            # Convert to GB
+            total_memory_usage += memory_bytes / (1024 * 1024 * 1024)
             
         avg_cpu = total_cpu_usage / node_count if node_count > 0 else 0
         avg_memory = total_memory_usage / node_count if node_count > 0 else 0
