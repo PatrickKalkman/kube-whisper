@@ -240,7 +240,7 @@ async def get_available_clusters():
         return {"error": f"Failed to get cluster information: {str(e)}"}
 
 async def switch_cluster(cluster_name: str):
-    """Switch to a different Kubernetes cluster context."""
+    """Switch to a different Kubernetes cluster context and persist the change."""
     try:
         # Get all available contexts
         contexts, active_context = config.list_kube_config_contexts()
@@ -258,12 +258,27 @@ async def switch_cluster(cluster_name: str):
                 "available_clusters": [ctx['context']['cluster'] for ctx in contexts]
             }
             
-        # Switch to the target context
+        # Load the current kubeconfig
+        config_file = config.kube_config.KUBE_CONFIG_DEFAULT_LOCATION
+        kube_config = config.kube_config.KubeConfigLoader(
+            config_file_name=config_file
+        ).load_and_merge()
+        
+        # Update the current-context
+        kube_config['current-context'] = target_context
+        
+        # Save the updated config back to file
+        config.kube_config.KubeConfigMerger(
+            config_file,
+            config_dict=kube_config
+        ).save()
+        
+        # Load the new context for the current session
         config.load_kube_config(context=target_context)
         
         return {
             "success": True,
-            "message": f"Successfully switched to cluster '{cluster_name}'",
+            "message": f"Successfully switched to cluster '{cluster_name}' and persisted the change",
             "context": target_context
         }
         
