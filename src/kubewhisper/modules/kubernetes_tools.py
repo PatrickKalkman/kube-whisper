@@ -143,6 +143,34 @@ async def analyze_deployment_logs(deployment_name: str, namespace: str = "defaul
         return {"error": f"Failed to analyze logs: {str(e)}"}
 
 
+async def get_version_info():
+    """Returns version information for both Kubernetes API server and nodes."""
+    try:
+        config.load_kube_config()
+        version_api = client.VersionApi()
+        core_api = client.CoreV1Api()
+        
+        # Get API server version
+        api_version = version_api.get_code()
+        
+        # Get node versions
+        nodes = core_api.list_node()
+        node_versions = {}
+        for node in nodes.items:
+            version = node.status.node_info.kubelet_version
+            node_versions[node.metadata.name] = version
+            
+        return {
+            "api_server": {
+                "version": api_version.git_version,
+                "platform": api_version.platform,
+                "build_date": api_version.build_date
+            },
+            "nodes": node_versions
+        }
+    except Exception as e:
+        return {"error": f"Failed to get version info: {str(e)}"}
+
 async def get_cluster_status():
     """Returns detailed status information about the Kubernetes cluster."""
     try:
@@ -235,10 +263,21 @@ function_map = {
     "get_number_of_namespaces": get_number_of_namespaces,
     "get_cluster_status": get_cluster_status,
     "analyze_deployment_logs": analyze_deployment_logs,
+    "get_version_info": get_version_info,
 }
 
 # Tools array for session initialization
 tools = [
+    {
+        "type": "function",
+        "name": "get_version_info",
+        "description": "Returns version information for both Kubernetes API server and nodes.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
     {
         "type": "function",
         "name": "analyze_deployment_logs",
