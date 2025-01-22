@@ -6,22 +6,12 @@ from kubewhisper.modules.logging import log_ws_event, log_warning, logger
 from kubewhisper.modules.websocket_manager import WebSocketManager
 from kubewhisper.modules.kubernetes_tools import function_map as k8s_function_map, tools as k8s_tools
 from kubewhisper.modules.async_microphone import AsyncMicrophone
+from kubewhisper.modules.session_config import SessionConfig
 from .event_handler import EventHandler
-from .audio_manager import AudioManager
-from .config import Config
 
 # Combine function maps and tools
 function_map = k8s_function_map
 tools = k8s_tools
-
-SESSION_INSTRUCTIONS = (
-    "You are Kuby, a helpful assistant. Respond to Pat. "
-    "Keep all of your responses short. Say things like: "
-    "'Task complete', 'There was an error', 'I need more information'."
-)
-PREFIX_PADDING_MS = 300
-SILENCE_THRESHOLD = 0.5
-SILENCE_DURATION_MS = 700
 
 
 class SimpleAssistant:
@@ -33,13 +23,12 @@ class SimpleAssistant:
         self.event_handler = EventHandler(self.mic, self.ws_manager, function_map)
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
-        self.audio_manager = AudioManager()
+        self.session_config = SessionConfig(tools)
 
     async def run(self):
         while True:
             try:
-                await self.ws_manager.connect()
-                await self.initialize_session()
+                await self._establish_connection()
                 ws_task = asyncio.create_task(self.process_ws_messages())
 
                 logger.info("Conversation started. Speak freely, and the assistant will respond.")
@@ -62,22 +51,9 @@ class SimpleAssistant:
                 self.mic.close()
                 await self.ws_manager.close()
 
-    async def initialize_session(self):
-        session_config = {
-            "modalities": ["text", "audio"],
-            "instructions": Config.SESSION_INSTRUCTIONS,
-            "voice": "sage",
-            "input_audio_format": "pcm16",
-            "output_audio_format": "pcm16",
-            "turn_detection": {
-                "type": "server_vad",
-                "threshold": Config.SILENCE_THRESHOLD,
-                "prefix_padding_ms": Config.PREFIX_PADDING_MS,
-                "silence_duration_ms": Config.SILENCE_DURATION_MS,
-            },
-            "tools": tools,
-        }
-        await self.ws_manager.initialize_session(session_config)
+    async def _establish_connection(self):
+        await self.ws_manager.connect()
+        await self.ws_manager.initialize_session(self.session_config.config)
 
     async def handle_connection_error(self, error):
         if isinstance(error, ConnectionClosedError):
@@ -89,17 +65,6 @@ class SimpleAssistant:
         else:
             logger.exception(f"An unexpected error occurred: {error}")
         return False
-
-    def get_user_voice_input(self):
-        print("Listening for your command...")
-        with self.microphone as source:
-            self.recognizer.adjust_for_ambient_noise(source)
-            try:
-                audio = self.recognizer.listen(source)
-                return self.recognizer.recognize_google(audio)
-            except sr.UnknownValueError:
-                print("Sorry, I couldn't understand that.")
-                return None
 
     async def process_ws_messages(self):
         while True:
