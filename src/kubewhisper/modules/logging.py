@@ -1,24 +1,13 @@
-import logging
-from rich.logging import RichHandler
-from rich.console import Console
-from rich.text import Text
+from loguru import logger
 
-console = Console()
-
-
-def setup_logging():
-    # Set up logging with Rich
-    logger = logging.getLogger("realtime_api")
-    logger.setLevel(logging.INFO)
-    handler = RichHandler(rich_tracebacks=True, console=console)
-    formatter = logging.Formatter("%(message)s", datefmt="[%X]")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.propagate = False
-    return logger
-
-
-logger = setup_logging()
+# Configure loguru
+logger.remove()  # Remove default handler
+logger.add(
+    sink=lambda msg: print(msg),
+    format="<level>{time:HH:mm:ss}</level> | {message}",
+    colorize=True,
+    level="INFO"
+)
 
 
 # Function to log WebSocket events
@@ -59,22 +48,22 @@ def log_ws_event(direction, event):
     }
     emoji = event_emojis.get(event_type, "❓")
     icon = "⬆️ - Out" if direction == "Outgoing" else "⬇️ - In"
-    style = "bold cyan" if direction == "Outgoing" else "bold green"
-    logger.info(Text(f"{emoji} {icon} {event_type}", style=style))
+    color = "<cyan>" if direction == "Outgoing" else "<green>"
+    logger.info(f"{color}{emoji} {icon} {event_type}</cyan>")
 
 
 def log_tool_call(function_name, args, result):
-    logger.info(Text(f"🛠️ Calling function: {function_name} with args: {args}", style="bold magenta"))
-    logger.info(Text(f"🛠️ Function call result: {result}", style="bold yellow"))
+    logger.info(f"<magenta>🛠️ Calling function: {function_name} with args: {args}</magenta>")
+    logger.info(f"<yellow>🛠️ Function call result: {result}</yellow>")
 
 
 def log_error(message):
-    logger.error(Text(message, style="bold red"))
+    logger.error(f"<red>{message}</red>")
 
 
-def log_info(message, style="bold white"):
-    logger.info(Text(message, style=style))
+def log_info(message, style="white"):
+    logger.info(f"<{style}>{message}</{style}>")
 
 
 def log_warning(message):
-    logger.warning(Text(message, style="bold yellow"))
+    logger.warning(f"<yellow>{message}</yellow>")
