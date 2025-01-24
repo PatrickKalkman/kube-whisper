@@ -3,25 +3,30 @@ import queue
 import logging
 from typing import Optional, Tuple, Any
 
+
 class AudioConfig:
     """Configuration constants for audio recording"""
+
     CHUNK_SIZE: int = 1024
     FORMAT: int = pyaudio.paInt16
     CHANNELS: int = 1
     SAMPLE_RATE: int = 24000
 
+
 class MicrophoneState:
     """Enum-like class for microphone states"""
+
     IDLE = "idle"
     RECORDING = "recording"
     RECEIVING = "receiving"
 
+
 class AsyncMicrophone:
     """Asynchronous microphone handler for recording audio streams.
-    
+
     Manages audio input stream and provides methods for controlling recording state.
     """
-    
+
     def __init__(self) -> None:
         """Initialize the microphone with PyAudio and setup the audio stream."""
         self._pyaudio = pyaudio.PyAudio()
@@ -37,19 +42,15 @@ class AsyncMicrophone:
         self._state: str = MicrophoneState.IDLE
         logging.info("AsyncMicrophone initialized")
 
-    def _audio_callback(self, 
-                      in_data: bytes, 
-                      frame_count: int, 
-                      time_info: dict, 
-                      status: int) -> Tuple[None, int]:
+    def _audio_callback(self, in_data: bytes, frame_count: int, time_info: dict, status: int) -> Tuple[None, int]:
         """PyAudio callback function for handling incoming audio data.
-        
+
         Args:
             in_data: Raw audio data
             frame_count: Number of frames
             time_info: Dictionary with timing information
             status: Status flags
-            
+
         Returns:
             Tuple of (None, pyaudio.paContinue) to continue streaming
         """
@@ -89,7 +90,7 @@ class AsyncMicrophone:
 
     def get_audio_data(self) -> Optional[bytes]:
         """Retrieve all accumulated audio data from the queue.
-        
+
         Returns:
             Combined audio data as bytes, or None if no data available
         """
@@ -112,7 +113,7 @@ class AsyncMicrophone:
     @property
     def state(self) -> str:
         """Get the current state of the microphone.
-        
+
         Returns:
             Current state as a string (IDLE, RECORDING, or RECEIVING)
         """
