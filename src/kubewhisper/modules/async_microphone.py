@@ -1,7 +1,7 @@
 import pyaudio
 import queue
 import logging
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple
 
 
 class AudioConfig:
