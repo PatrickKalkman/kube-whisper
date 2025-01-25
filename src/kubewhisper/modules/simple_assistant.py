@@ -91,7 +91,7 @@ class SimpleAssistant:
                 # Ensure we're recording when not receiving
                 if self.mic.state == MicrophoneState.IDLE:
                     self.mic.start_recording()
-                    
+
                 if self.mic.state == MicrophoneState.RECORDING:
                     try:
                         audio_data = self.mic.get_audio_data()
@@ -111,11 +111,11 @@ class SimpleAssistant:
                                 logger.debug("Empty audio data received")
                         else:
                             logger.debug("No audio data available")
-                            
+
                         # Log buffer state
                         buffer_size = self.mic._audio_queue.qsize()
                         logger.debug(f"Audio buffer size: {buffer_size} chunks")
-                        
+
                     except Exception as e:
                         logger.error(f"Error processing audio data: {str(e)}")
                         logger.debug(f"Microphone state: {self.mic.state}")
