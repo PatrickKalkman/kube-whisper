@@ -49,7 +49,7 @@ cd kubewhisper
 
 3. **Set up your OpenAI key**:
 ```bash
-echo "OPENAI_API_KEY=your-key-goes-here" > .env
+export OPENAI_API_KEY='your-api-key-here'
 ```
 
 ### Running KubeWhisper
@@ -58,12 +58,6 @@ Ready to talk to your cluster? It's as simple as:
 
 ```bash
 uv run kubewhisper
-```
-
-Want more details about what's happening? Add the verbose flag:
-
-```bash
-uv run kubewhisper --verbose
 ```
 
 ## 🎯 Example Commands
