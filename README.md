@@ -12,7 +12,7 @@
 
 Ever wished you could just ask your Kubernetes cluster what's going on? No more wrestling with complex kubectl commands or digging through documentation. KubeWhisper lets you manage your cluster through natural conversation, powered by OpenAI's Realtime API. Just speak, and let KubeWhisper handle the rest.
 
-Read the full story behind KubeWhisper in my [Medium article](https://medium.com/@pkalkman).
+Read the full story behind KubeWhisper in my [Medium article](https://medium.com/generative-ai/whisper-to-your-kubernetes-cluster-building-kubewhisper-the-voice-activated-ai-assistant-9ef33c0426d2).
 
 ## ✨ Key Features
 
